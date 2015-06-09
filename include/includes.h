@@ -157,7 +157,6 @@ int sigprocmask (int, sigset_t *, sigset_t *);
 
 #include <radcli/radcli.h>
 
-#define AUTH_VECTOR_LEN		16
 #define GETSTR_LENGTH		128	//!< must be bigger than AUTH_PASS_LEN.
 
 typedef struct pw_auth_hdr
@@ -205,5 +204,12 @@ struct rc_conf
 	rc_sockets_override	so;
 	unsigned		so_type; /* rc_socket_type */
 };
+
+typedef struct request_info
+{
+	char	secret[MAX_SECRET_LENGTH + 1]; //!< The secret used for this request
+	char	request_vector[AUTH_VECTOR_LEN]; //< The auth vector used in this request
+} REQUEST_INFO;
+
 
 #endif

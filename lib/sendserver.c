@@ -272,11 +272,12 @@ const static rc_sockets_override default_socket_funcs = {
  * @param msg must be an array of %PW_MAX_MSG_SIZE or NULL; will contain the concatenation of
  *	any %PW_REPLY_MESSAGE received.
  * @param type must be %AUTH or %ACCT
+ * @param info if non-NULL it will contain information about the sent request; It must be released using rc_request_info_free().
  * @return OK_RC (0) on success, TIMEOUT_RC on timeout REJECT_RC on acess reject, or negative
  *	on failure as return value.
  */
-int rc_send_server (rc_handle *rh, SEND_DATA *data, char *msg,
-                    rc_type type)
+int rc_send_server_info (rc_handle *rh, SEND_DATA *data, char *msg,
+                         rc_type type, REQUEST_INFO **info)
 {
 	int             sockfd = -1;
 	AUTH_HDR       *auth, *recv_auth;
@@ -591,6 +592,13 @@ int rc_send_server (rc_handle *rh, SEND_DATA *data, char *msg,
 	}
 
 	SCLOSE (sockfd);
+	if (info) {
+		*info = malloc(sizeof(REQUEST_INFO));
+		if (*info) {
+			memcpy((*info)->secret, secret, sizeof((*info)->secret));
+			memcpy((*info)->request_vector, vector, sizeof((*info)->request_vector));
+		}
+	}
 	memset (secret, '\0', sizeof (secret));
 
 	if (msg) {
@@ -635,6 +643,22 @@ int rc_send_server (rc_handle *rh, SEND_DATA *data, char *msg,
 	}
 
 	return result;
+}
+
+/** Sends a request to a RADIUS server and waits for the reply
+ *
+ * @param rh a handle to parsed configuration
+ * @param data a pointer to a SEND_DATA structure
+ * @param msg must be an array of %PW_MAX_MSG_SIZE or NULL; will contain the concatenation of
+ *	any %PW_REPLY_MESSAGE received.
+ * @param type must be %AUTH or %ACCT
+ * @return OK_RC (0) on success, TIMEOUT_RC on timeout REJECT_RC on acess reject, or negative
+ *	on failure as return value.
+ */
+int rc_send_server(rc_handle *rh, SEND_DATA *data, char *msg,
+                   rc_type type)
+{
+	return rc_send_server_info(rh, data, msg, type, NULL);
 }
 
 /** Verify items in returned packet

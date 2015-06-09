@@ -3,6 +3,13 @@
 - Corrections in the link creation during install.
 - Corrections in the types of the distributed dictionary.
 - Added compatibility headers for radiusclient-ng.
+- Added new API to access info about a request.
+- API and ABI modifications:
+  - rc_request_info_free: New function
+  - rc_request_info_get_secret: New function
+  - rc_request_info_get_vector: New function
+  - rc_aaa_info: New function
+  - rc_send_server_info: New function
 
 
 * Version 1.2.0 (released 2015-06-07)

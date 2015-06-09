@@ -462,6 +462,11 @@ typedef struct send_data /* Used to pass information to sendserver() function */
 	VALUE_PAIR     *receive_pairs;  //!< Where to place received a/v pairs.
 } SEND_DATA;
 
+#define AUTH_VECTOR_LEN		16
+
+struct request_info;
+typedef struct request_info REQUEST_INFO;
+
 #ifndef MIN
 #define MIN(a, b)     ((a) < (b) ? (a) : (b))
 #endif
@@ -559,6 +564,8 @@ int rc_check(rc_handle *rh, char *host, char *secret, unsigned short port, char 
 
 int rc_aaa(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **received,
 	   char *msg, int add_nas_port, rc_standard_codes request_type);
+int rc_aaa_info(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **received,
+	        char *msg, int add_nas_port, rc_standard_codes request_type, REQUEST_INFO **info);
 
 /* config.c */
 
@@ -612,6 +619,13 @@ void rc_openlog(char const *ident);
 
 int rc_send_server (rc_handle *rh, SEND_DATA *data, char *msg,
                     rc_type type);
+int rc_send_server_info (rc_handle *rh, SEND_DATA *data, char *msg,
+                         rc_type type, REQUEST_INFO **info);
+
+/* request_info.c */
+void rc_request_info_free(REQUEST_INFO *info);
+const char *rc_request_info_get_secret(REQUEST_INFO *info);
+const void *rc_request_info_get_vector(REQUEST_INFO *info);
 
 __END_DECLS
 
