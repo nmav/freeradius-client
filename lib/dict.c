@@ -14,7 +14,7 @@
 
 /**
  * @defgroup radcli-api Main API
- * @brief Main API Functions 
+ * @brief Main API Functions
  *
  * @{
  */
@@ -124,6 +124,10 @@ int rc_read_dictionary (rc_handle *rh, char const *filename)
 				type = PW_TYPE_INTEGER;
 			}
 			else if (strcmp (typestr, "ipaddr") == 0)
+			{
+				type = PW_TYPE_IPADDR;
+			}
+			else if (strcmp (typestr, "ipv4addr") == 0)
 			{
 				type = PW_TYPE_IPADDR;
 			}

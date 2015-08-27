@@ -24,7 +24,7 @@
 
 /**
  * @defgroup radcli-api Main API
- * @brief Main API Functions 
+ * @brief Main API Functions
  *
  * @{
  */
@@ -152,12 +152,18 @@ VALUE_PAIR *rc_avpair_new (rc_handle const *rh, int attrid, void const *pval, in
 {
 	VALUE_PAIR     *vp = NULL;
 	DICT_ATTR      *pda;
+        int vattrid;
 
-	attrid = attrid | (vendorpec << 16);
-	if ((pda = rc_dict_getattr (rh, attrid)) == NULL)
+        if(vendorpec != VENDOR_NONE) {
+                vattrid = attrid | (vendorpec << 16);
+        } else {
+                vattrid = attrid;
+        }
+	if ((pda = rc_dict_getattr (rh, vattrid)) == NULL)
 	{
-		rc_log(LOG_ERR,"rc_avpair_new: no attribute %d in dictionary", attrid);
-		return NULL;
+                rc_log(LOG_ERR,"rc_avpair_new: no attribute %d/%u in dictionary",
+                       vendorpec,attrid);
+                return NULL;
 	}
 	if (vendorpec != 0 && rc_dict_getvend(rh, vendorpec) == NULL)
 	{
@@ -167,7 +173,7 @@ VALUE_PAIR *rc_avpair_new (rc_handle const *rh, int attrid, void const *pval, in
 	if ((vp = malloc (sizeof (VALUE_PAIR))) != NULL)
 	{
 		strlcpy (vp->name, pda->name, sizeof (vp->name));
-		vp->attribute = attrid;
+		vp->attribute = vattrid;
 		vp->next = NULL;
 		vp->type = pda->type;
 		if (rc_avpair_assign (vp, pval, len) == 0)
@@ -392,6 +398,34 @@ VALUE_PAIR *rc_avpair_get (VALUE_PAIR *vp, int attrid, int vendorpec)
 		continue;
 	}
 	return vp;
+}
+
+/*
+ * Function: rc_avpair_copy
+ *
+ * Purpose: Return a copy of the existing list "p" ala strdup().
+ *
+ */
+VALUE_PAIR *rc_avpair_copy(VALUE_PAIR *p)
+{
+	VALUE_PAIR *vp, *fp = NULL, *lp = NULL;
+
+	while (p) {
+		vp = malloc(sizeof(VALUE_PAIR));
+		if (!vp) {
+                  rc_log(LOG_CRIT, "rc_avpair_copy: out of memory");
+                  return NULL;  /* could leak pairs already copied */
+		}
+		*vp = *p;
+		if (!fp)
+			fp = vp;
+		if (lp)
+			lp->next = vp;
+		lp = vp;
+		p = p->next;
+	}
+
+	return fp;
 }
 
 /** Insert a VALUE_PAIR into a list
@@ -975,3 +1009,9 @@ void rc_avpair_get_attr (VALUE_PAIR *vp, unsigned *type, unsigned *id)
 }
 
 /** @} */
+/*
+ * Local Variables:
+ * c-basic-offset:8
+ * c-style: whitesmith
+ * End:
+ */

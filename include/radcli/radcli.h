@@ -15,10 +15,13 @@
 #ifndef RADCLI_H
 #define RADCLI_H
 
+#undef CP_DEBUG
+extern unsigned int radcli_debug;
+extern void rc_setdebug(int debug);
 #ifdef CP_DEBUG
-#define		DEBUG(args, ...)	rc_log(## args)
+#define		DEBUG(args...)	if(radcli_debug) syslog(args)
 #else
-#define		DEBUG(args, ...)	;
+#define		DEBUG(args...)	;
 #endif
 
 #include	<sys/types.h>
@@ -45,7 +48,7 @@ extern "C" {
 
 /**
  * @defgroup radcli-api Main API
- * @brief Main API Functions 
+ * @brief Main API Functions
  *
  * @{
  */
@@ -87,7 +90,7 @@ typedef struct rc_conf rc_handle;
  * Several of its fields have been deprecated.
  */
 typedef struct server {
-	int max; //!< for backwards compatibility; its value will be 1.
+	int   max;
 	char *name[SERVER_MAX];
 	uint16_t port[SERVER_MAX];
 	char *secret[SERVER_MAX];
@@ -388,6 +391,38 @@ typedef enum rc_acct_auth_type {
 	PW_REMOTE=3
 } rc_acct_auth_type;
 
+/** \enum rc_vendor_pec --- http://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
+ */
+typedef enum rc_vendor_pec {
+  VENDOR_NONE=0,
+  VENDOR_MICROSOFT	     = 311,
+  VENDOR_ROARING_PENGUIN     = 10055
+} rc_vendor_type;
+
+/* Vendor RADIUS attribute-value pairs for MICROSOFT */
+enum rc_vendor_attr_microsoft {
+  PW_MS_CHAP_CHALLENGE	=	11,	/* string */
+  PW_MS_CHAP_RESPONSE	=	1,	/* string */
+  PW_MS_CHAP2_RESPONSE	=	25,	/* string */
+  PW_MS_CHAP2_SUCCESS	=	26,	/* string */
+  PW_MS_MPPE_ENCRYPTION_POLICY=	7,	/* string */
+  PW_MS_MPPE_ENCRYPTION_TYPE=	8,	/* string */
+  PW_MS_MPPE_ENCRYPTION_TYPES=PW_MS_MPPE_ENCRYPTION_TYPE,
+  PW_MS_CHAP_MPPE_KEYS	=	12,	/* string */
+  PW_MS_MPPE_SEND_KEY	=	16,	/* string */
+  PW_MS_MPPE_RECV_KEY	=	17,	/* string */
+  PW_MS_PRIMARY_DNS_SERVER=	28,	/* ipaddr */
+  PW_MS_SECONDARY_DNS_SERVER=	29,	/* ipaddr */
+  PW_MS_PRIMARY_NBNS_SERVER=	30,	/* ipaddr */
+  PW_MS_SECONDARY_NBNS_SERVER=	31,	/* ipaddr */
+};
+
+/* Vendor RADIUS attribute-value pairs for Roaring Penguin: Bandwidth bit rate limits */
+enum rc_vendor_attr_roaringpenguin {
+  PW_RP_UPSTREAM_LIMIT        =1,  /* integer */
+  PW_RP_DOWNSTREAM_LIMIT      =2,  /* integer */
+};
+
 /* PROHIBIT PROTOCOL */
 #define PW_DUMB			0	//!< 1 and 2 are defined in FRAMED PROTOCOLS.
 #define PW_AUTH_ONLY		3
@@ -504,7 +539,7 @@ typedef struct rc_aaa_ctx_st RC_AAA_CTX;
  *
  * Alternative operation without a configuration file is also possible, see
  * rc_add_config().
- * 
+ *
  * Check radexample.c for a functional example.
  *
  */
@@ -531,12 +566,13 @@ typedef struct rc_aaa_ctx_st RC_AAA_CTX;
 
 /* avpair.c */
 
-VALUE_PAIR *rc_avpair_add (rc_handle const *rh, VALUE_PAIR **list, int attrid, void const *pval, int len, int vendorpec);
-int rc_avpair_assign (VALUE_PAIR *vp, void const *pval, int len);
-VALUE_PAIR *rc_avpair_new (rc_handle const *rh, int attrid, void const *pval, int len, int vendorpec);
-VALUE_PAIR *rc_avpair_gen(rc_handle const *rh, VALUE_PAIR *pair, unsigned char const *ptr,
+  VALUE_PAIR *rc_avpair_add (rc_handle const *rh, VALUE_PAIR **list, int attrid, void const *pval, int len, int vendorpec);
+  int rc_avpair_assign (VALUE_PAIR *vp, void const *pval, int len);
+  VALUE_PAIR *rc_avpair_new (rc_handle const *rh, int attrid, void const *pval, int len, int vendorpec);
+  VALUE_PAIR *rc_avpair_gen(rc_handle const *rh, VALUE_PAIR *pair, unsigned char const *ptr,
 			  int length, int vendorpec);
 VALUE_PAIR *rc_avpair_get (VALUE_PAIR *vp, int attrid, int vendorpec);
+VALUE_PAIR *rc_avpair_copy(VALUE_PAIR *p);
 void rc_avpair_insert(VALUE_PAIR **a, VALUE_PAIR *p, VALUE_PAIR *b);
 void rc_avpair_free (VALUE_PAIR *pair);
 int rc_avpair_parse (rc_handle const *rh, char const *buffer, VALUE_PAIR **first_pair);
@@ -553,7 +589,8 @@ void rc_avpair_get_attr (VALUE_PAIR *vp, unsigned *type, unsigned *id);
 
 void rc_buildreq(rc_handle const *rh, SEND_DATA *data, int code, char *server, unsigned short port,
 		 char *secret, int timeout, int retries);
-int rc_auth(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **received, char *msg);
+int rc_auth(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send,
+            VALUE_PAIR **received, char *msg);
 int rc_auth_proxy(rc_handle *rh, VALUE_PAIR *send, VALUE_PAIR **received, char *msg);
 int rc_acct(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send);
 int rc_acct_proxy(rc_handle *rh, VALUE_PAIR *send);
@@ -561,8 +598,13 @@ int rc_check(rc_handle *rh, char *host, char *secret, unsigned short port, char 
 
 int rc_aaa(rc_handle *rh, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **received,
 	   char *msg, int add_nas_port, rc_standard_codes request_type);
-int rc_aaa_ctx(rc_handle *rh, RC_AAA_CTX **ctx, uint32_t client_port, VALUE_PAIR *send, VALUE_PAIR **received,
-	        char *msg, int add_nas_port, rc_standard_codes request_type);
+int rc_aaa_ctx(rc_handle *rh, RC_AAA_CTX **ctx, uint32_t client_port, VALUE_PAIR *send,
+               VALUE_PAIR **received,
+               char *msg, int add_nas_port, rc_standard_codes request_type);
+int rc_aaa_ctx_server(rc_handle *rh, RC_AAA_CTX **ctx, SERVER *aaaserver,
+                      rc_type type, uint32_t client_port,
+                      VALUE_PAIR *send, VALUE_PAIR **received,
+                      char *msg, int add_nas_port, rc_standard_codes request_type);
 
 /* config.c */
 
@@ -597,6 +639,9 @@ void rc_dict_free(rc_handle *rh);
 
 int rc_tls_fd(rc_handle * rh);
 int rc_check_tls(rc_handle * rh);
+
+/* util.c */
+char *rc_mksid __P((void));
 
 /* ip_util.c */
 

@@ -14,7 +14,7 @@
 
 /**
  * @defgroup radcli-api Main API
- * @brief Main API Functions 
+ * @brief Main API Functions
  *
  * @{
  */
@@ -25,6 +25,11 @@
 #include <options.h>
 #include "util.h"
 #include "tls.h"
+
+#ifndef TRUE
+#define TRUE  1
+#define FALSE 0
+#endif
 
 /** Find an option in the option list
  *
@@ -121,104 +126,108 @@ static int set_option_srv(char const *filename, int line, OPTION *option, char c
 		serv->max = 0;
 	}
 
-	if (serv->max > 0) {
-		DEBUG(LOG_ERR, "cannot set multiple servers");
-		return -1;
-	}
-
 	p_pointer = strtok_r(p_dupe, ", \t", &p_save);
 
-	/* check to see for '[IPv6]:port' syntax */
-	if ((q = strchr(p_pointer,'[')) != NULL) {
-		*q = '\0';
-		q++;
-		p_pointer = q;
+        while(p_pointer != NULL) {
+                if (serv->max > SERVER_MAX) {
+                        DEBUG(LOG_ERR, "cannot set more than %d servers", SERVER_MAX);
+                        return -1;
+                }
 
-		q = strchr(p_pointer, ']');
-		if (q == NULL) {
-			free(p_dupe);
-			rc_log(LOG_CRIT, "read_config: IPv6 parse error");
-			return -1;
-		}
-		*q = '\0';
-		q++;
+		DEBUG(LOG_ERR, "processing server: %s", p_pointer);
+                /* check to see for '[IPv6]:port' syntax */
+                if ((q = strchr(p_pointer,'[')) != NULL) {
+                        *q = '\0';
+                        q++;
+                        p_pointer = q;
 
-		if (q[0] == ':') {
-			q++;
-		}
+                        q = strchr(p_pointer, ']');
+                        if (q == NULL) {
+                                free(p_dupe);
+                                rc_log(LOG_CRIT, "read_config: IPv6 parse error");
+                                return -1;
+                        }
+                        *q = '\0';
+                        q++;
 
-		/* Check to see if we have '[IPv6]:port:secret' syntax */
-		if((s=strchr(q, ':')) != NULL) {
-			*s = '\0';
-			s++;
-			serv->secret[serv->max] = strdup(s);
-			if (serv->secret[serv->max] == NULL) {
-				rc_log(LOG_CRIT, "read_config: out of memory");
-				if (option->val == NULL) {
-					free(p_dupe);
-					free(serv);
-				}
-				return -1;
-			}
-		}
+                        if (q[0] == ':') {
+                                q++;
+                        }
 
-	} else /* Check to see if we have 'servername:port' syntax */
-	if ((q = strchr(p_pointer,':')) != NULL) {
-		*q = '\0';
-		q++;
+                        /* Check to see if we have '[IPv6]:port:secret' syntax */
+                        if((s=strchr(q, ':')) != NULL) {
+                                *s = '\0';
+                                s++;
+                                serv->secret[serv->max] = strdup(s);
+                                if (serv->secret[serv->max] == NULL) {
+                                        rc_log(LOG_CRIT, "read_config: out of memory");
+                                        if (option->val == NULL) {
+                                                free(p_dupe);
+                                                free(serv);
+                                        }
+                                        return -1;
+                                }
+                        }
 
-		/* Check to see if we have 'servername:port:secret' syntax */
-		if((s = strchr(q,':')) != NULL) {
-			*s = '\0';
-			s++;
-			serv->secret[serv->max] = strdup(s);
-			if (serv->secret[serv->max] == NULL) {
-				rc_log(LOG_CRIT, "read_config: out of memory");
-				if (option->val == NULL) {
-					free(p_dupe);
-					free(serv);
-				}
-				return -1;
-			}
-		}
-	}
+                } else /* Check to see if we have 'servername:port' syntax */
+                        if ((q = strchr(p_pointer,':')) != NULL) {
+                                *q = '\0';
+                                q++;
 
-	if(q && strlen(q) > 0) {
-		serv->port[serv->max] = atoi(q);
-	} else {
-		if (!strcmp(option->name,"authserver"))
-			if ((svp = getservbyname ("radius", "udp")) == NULL)
-				serv->port[serv->max] = PW_AUTH_UDP_PORT;
-			else
-				serv->port[serv->max] = ntohs ((unsigned int) svp->s_port);
-		else if (!strcmp(option->name, "acctserver"))
-			if ((svp = getservbyname ("radacct", "udp")) == NULL)
-				serv->port[serv->max] = PW_ACCT_UDP_PORT;
-			else
-				serv->port[serv->max] = ntohs ((unsigned int) svp->s_port);
-		else {
-			rc_log(LOG_ERR, "%s: line %d: no default port for %s", filename, line, option->name);
-			if (option->val == NULL) {
-				free(p_dupe);
-				free(serv);
-			}
-			return -1;
-		}
-	}
+                                /* Check to see if we have 'servername:port:secret' syntax */
+                                if((s = strchr(q,':')) != NULL) {
+                                        *s = '\0';
+                                        s++;
+                                        serv->secret[serv->max] = strdup(s);
+                                        if (serv->secret[serv->max] == NULL) {
+                                                rc_log(LOG_CRIT, "read_config: out of memory");
+                                                if (option->val == NULL) {
+                                                        free(p_dupe);
+                                                        free(serv);
+                                                }
+                                                return -1;
+                                        }
+                                }
+                        }
 
-	serv->name[serv->max] = strdup(p_pointer);
-	if (serv->name[serv->max] == NULL) {
-		rc_log(LOG_CRIT, "read_config: out of memory");
-		if (option->val == NULL) {
-			free(p_dupe);
-			free(serv);
-		}
-		return -1;
-	}
-	free(p_dupe);
+                if(q && strlen(q) > 0) {
+                        serv->port[serv->max] = atoi(q);
+                } else {
+                        if (!strcmp(option->name,"authserver"))
+                                if ((svp = getservbyname ("radius", "udp")) == NULL)
+                                        serv->port[serv->max] = PW_AUTH_UDP_PORT;
+                                else
+                                        serv->port[serv->max] = ntohs ((unsigned int) svp->s_port);
+                        else if (!strcmp(option->name, "acctserver"))
+                                if ((svp = getservbyname ("radacct", "udp")) == NULL)
+                                        serv->port[serv->max] = PW_ACCT_UDP_PORT;
+                                else
+                                        serv->port[serv->max] = ntohs ((unsigned int) svp->s_port);
+                        else {
+                                rc_log(LOG_ERR, "%s: line %d: no default port for %s", filename, line, option->name);
+                                if (option->val == NULL) {
+                                        free(p_dupe);
+                                        free(serv);
+                                }
+                                return -1;
+                        }
+                }
 
-	serv->max++;
+                serv->name[serv->max] = strdup(p_pointer);
+                if (serv->name[serv->max] == NULL) {
+                        rc_log(LOG_CRIT, "read_config: out of memory");
+                        if (option->val == NULL) {
+                                free(p_dupe);
+                                free(serv);
+                        }
+                        return -1;
+                }
 
+                serv->max++;
+                p_pointer = strtok_r(NULL, ", \t", &p_save);
+        }
+
+        free(p_dupe);
 	if (option->val == NULL)
 		option->val = (void *)serv;
 
@@ -391,40 +400,41 @@ rc_handle *rc_config_init(rc_handle *rh)
 
 static int apply_config(rc_handle *rh)
 {
-	const char *txt;
-	int ret;
-
 	memset(&rh->own_bind_addr, 0, sizeof(rh->own_bind_addr));
 	rh->own_bind_addr_set = 0;
 	rc_own_bind_addr(rh, &rh->own_bind_addr);
 	rh->own_bind_addr_set = 1;
 #ifdef HAVE_GNUTLS
-	txt = rc_conf_str(rh, "serv-auth-type");
-	if (txt != NULL) {
-		if (strcasecmp(txt, "dtls") == 0) {
-		    	ret = rc_init_tls(rh, SEC_FLAG_DTLS);
-		} else if (strcasecmp(txt, "tls") == 0) {
-		    	ret = rc_init_tls(rh, 0);
-		} else {
-			rc_log(LOG_CRIT, "unknown server authentication type: %s", txt);
-			return -1;
-		}
+        {
+                const char *txt;
+                int ret;
+                txt = rc_conf_str(rh, "serv-auth-type");
+                if (txt != NULL) {
+                        if (strcasecmp(txt, "dtls") == 0) {
+                                ret = rc_init_tls(rh, SEC_FLAG_DTLS);
+                        } else if (strcasecmp(txt, "tls") == 0) {
+                                ret = rc_init_tls(rh, 0);
+                        } else {
+                                rc_log(LOG_CRIT, "unknown server authentication type: %s", txt);
+                                return -1;
+                        }
 
-	    	if (ret < 0) {
-	    		rc_log(LOG_CRIT, "error initializing %s", txt);
-			return -1;
-		}
-	}
+                        if (ret < 0) {
+                                rc_log(LOG_CRIT, "error initializing %s", txt);
+                                return -1;
+                        }
+                }
+        }
 #endif
 
-	return 0;	
+	return 0;
 
 }
 
 /** Read the global config file
  *
- * This function will load the provided configuration file, and 
- * any other files such as the dictionary. 
+ * This function will load the provided configuration file, and
+ * any other files such as the dictionary.
  *
  * Note: To preserve compatibility with libraries of the same API
  * which don't load the dictionary care is taken not to reload the
@@ -547,6 +557,13 @@ rc_handle *rc_read_config(char const *filename)
 		return NULL;
 	}
 
+        {
+                int clientdebug = rc_conf_int_2(rh, "clientdebug", FALSE);
+                if(clientdebug > 0) {
+                        radcli_debug = clientdebug;
+                }
+        }
+
 	p = rc_conf_str(rh, "dictionary");
 	if (p != NULL) {
 		if (rc_read_dictionary(rh, p) != 0) {
@@ -587,7 +604,7 @@ char *rc_conf_str(rc_handle const *rh, char const *optname)
  * @param optname the name of an option.
  * @return config option value.
  */
-int rc_conf_int(rc_handle const *rh, char const *optname)
+int rc_conf_int_2(rc_handle const *rh, char const *optname, int complain)
 {
 	OPTION *option;
 
@@ -596,14 +613,19 @@ int rc_conf_int(rc_handle const *rh, char const *optname)
 	if (option != NULL) {
 		if (option->val) {
 			return *((int *)option->val);
-		} else {
+		} else if(complain) {
 			rc_log(LOG_ERR, "rc_conf_int: config option %s was not set", optname);
-			return 0;
 		}
+                return 0;
 	} else {
 		rc_log(LOG_CRIT, "rc_conf_int: unkown config option requested: %s", optname);
 		return 0;
 	}
+}
+
+int rc_conf_int(rc_handle const *rh, char const *optname)
+{
+        return rc_conf_int_2(rh, optname, TRUE);
 }
 
 /** Get the value of a config option
@@ -692,8 +714,8 @@ static int find_match (const struct addrinfo* addr, const struct addrinfo *hostn
 			len1 = SA_GET_INLEN(ptr->ai_addr);
 			len2 = SA_GET_INLEN(ptr2->ai_addr);
 
-			if (len1 > 0 && 
-			    len1 == len2 && 
+			if (len1 > 0 &&
+			    len1 == len2 &&
 			    memcmp(SA_GET_INADDR(ptr->ai_addr), SA_GET_INADDR(ptr2->ai_addr), len1) == 0) {
 				return 0;
 			}
@@ -763,7 +785,7 @@ static int rc_is_myname(const struct addrinfo *info)
  * @param info: will hold a pointer to addrinfo
  * @param secret will hold the server's secret (of %MAX_SECRET_LENGTH).
  * @param type %AUTH or %ACCT
- 
+
  * @return 0 on success, -1 on failure.
  */
 int rc_find_server_addr (rc_handle const *rh, char const *server_name,
@@ -891,7 +913,7 @@ int rc_find_server_addr (rc_handle const *rh, char const *server_name,
 			 server_name, rc_conf_str(rh, "servers"));
 		goto fail;
 	}
-	
+
 	result = 0;
 	goto cleanup;
 
@@ -979,3 +1001,9 @@ rc_socket_type rc_get_socket_type(rc_handle *rh)
 }
 
 /** @} */
+ /*
+ * Local Variables:
+ * c-basic-offset:8
+ * c-style: whitesmith
+ * End:
+ */
